@@ -913,6 +913,7 @@ Status Decoder::decode(const uint8_t *p, size_t n)
             sideOk = d.readSideInfo(sb, mainDataBegin, scfsi, gr);
         } else {
             uint8_t side[40] = {};   // ως 32 bytes, με περιθώριο για τον γρήγορο αναγνώστη
+            static_assert(sizeof side >= 32 + sizeof(uint32_t), "FastBits reads 4 bytes from any position before the end");   // A10 B33
             std::memcpy(side, p + headBytes, size_t(h.sideBytes));
             FastBits sb;
             sb.p = side;
@@ -939,7 +940,12 @@ Status Decoder::decode(const uint8_t *p, size_t n)
         d.holeStart = d.holeStart > drop ? d.holeStart - drop : 0;
         d.holeEnd = d.holeEnd > drop ? d.holeEnd - drop : 0;
     }
-    if (d.reservoir.size() < d.reservoirLen + mainBytes + lostBytes + 8) d.reservoir.resize(d.reservoirLen + mainBytes + lostBytes + 8);
+    // A10 B33: το περιθώριο της δεξαμενής, για τους δύο αναγνώστες που διαβάζουν πέρα από τα δεδομένα: ο Huffman ως 8 bytes
+    // (mp3huff.h) και ο FastBits 4 από τη θέση του. Ίδιο με το «+ 8» που ήταν εδώ.
+    constexpr size_t kReservoirSlack = 8;
+    static_assert(kReservoirSlack >= 8 && kReservoirSlack >= sizeof(uint32_t), "the reservoir needs room past its data");
+    if (d.reservoir.size() < d.reservoirLen + mainBytes + lostBytes + kReservoirSlack)
+        d.reservoir.resize(d.reservoirLen + mainBytes + lostBytes + kReservoirSlack);
     // Όταν λείπουν προηγούμενα καρέ (αρχή ροής, μετά από μετακίνηση) η αρχή των κύριων δεδομένων πέφτει πριν από ό,τι έχουμε:
     // `mainStart` αρνητικό. Ένα granule που αρχίζει μέσα σε αυτό που λείπει δεν αποκωδικοποιείται: σιωπή και στα δύο κανάλια
     // του (το ένα χωρίς το άλλο δεν είναι ο ήχος του καρέ, ιδίως στο στέρεο μέσου/διαφοράς)· το επόμενο granule, κανονικά.

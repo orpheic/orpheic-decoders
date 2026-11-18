@@ -1864,6 +1864,12 @@ void Decoder::predict(const void *subs, const FrameHead &h)
 Status Decoder::decode(const uint8_t *p, size_t n, size_t &used)
 {
     used = 0;
+    // A10 B31: τίποτα από το προηγούμενο καρέ δεν επιζεί μιας κλήσης που αποτυγχάνει. Πιο κάτω οι χώροι των καναλιών μπορεί να
+    // μεγαλώσουν (resize = νέα μνήμη), και το cur_ θα έδειχνε στην παλιά· το head_ θα έλεγε σχήμα καρέ που δεν υπάρχει πια.
+    // Κανένας καλών δεν τα διαβάζει μετά από αποτυχία σήμερα (ο flaccodec γράφει κάθε καρέ πριν ζητήσει το επόμενο): έτσι
+    // ούτε μελλοντικός μπορεί. Μετά από αποτυχία, head() = κενό (μηδέν δείγματα) και write() δεν γράφει τίποτα.
+    head_ = FrameHead();
+    for (int32_t *&c : cur_) c = nullptr;
     span_ = n < 16 ? n : 16;   // η κεφαλίδα θέλει ως 16 bytes
     filled_ = 0;
     const double tFrame = stats_ ? nowNs() : 0;

@@ -37,7 +37,7 @@ target_link_libraries(orpheic_decoders INTERFACE orpheic_mp3 orpheic_flac orphei
 option(ORPHEIC_DECODERS_TOOLS "Build the small command-line tools under tools/" ON)
 if(ORPHEIC_DECODERS_TOOLS)
   file(GLOB tool_sources CONFIGURE_DEPENDS tools/*.cpp)
-  list(FILTER tool_sources EXCLUDE REGEX "/speedtest\\.cpp$")   # needs FFmpeg: below
+  list(FILTER tool_sources EXCLUDE REGEX "/(speedtest|refbench)\\.cpp$")   # need FFmpeg (and refbench libFLAC, libmpg123): below
   foreach(src ${tool_sources})
     get_filename_component(name ${src} NAME_WE)
     add_executable(${name} ${src})
@@ -64,5 +64,19 @@ if(ORPHEIC_DECODERS_TOOLS)
     endif()
   else()
     message(STATUS "FFmpeg 5.1+ development files not found: speedtest is not built (the other tools are)")
+  endif()
+  # refbench compares the FLAC decoder with libFLAC and the MP3 decoder with libmpg123, through their public APIs only (and
+  # reads MP3 packets with libavformat): built only when all three are there (pkg-config: flac, libmpg123, FFmpeg as above).
+  if(PKG_CONFIG_FOUND AND FFMPEG_FOUND)
+    pkg_check_modules(REFLIBS IMPORTED_TARGET flac libmpg123)
+  endif()
+  if(REFLIBS_FOUND)
+    add_executable(refbench tools/refbench.cpp)
+    target_link_libraries(refbench PRIVATE orpheic_decoders PkgConfig::REFLIBS PkgConfig::FFMPEG)
+    if(WIN32)
+      target_sources(refbench PRIVATE tools/utf8.manifest)
+    endif()
+  else()
+    message(STATUS "libFLAC, libmpg123 or FFmpeg development files not found: refbench is not built")
   endif()
 endif()

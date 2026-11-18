@@ -71,6 +71,11 @@ struct FrameHead {
     int headBytes = 0;
 };
 
+// A10 B33: πόσα bytes μετά το τέλος των δεδομένων πρέπει να ΔΙΑΒΑΖΟΝΤΑΙ (ό,τι κι αν έχουν): το decode ως 8, η κεφαλίδα ως 16.
+// Ο καλών τα εγγυάται· το flaccodec.cpp το ελέγχει στη μεταγλώττιση.
+inline constexpr size_t kReadsPastEnd = 8;
+inline constexpr size_t kHeadSearchReads = 16;
+
 // Μόνο η κεφαλίδα (για αναζήτηση συγχρονισμού). Χρειάζονται ως 16 bytes.
 Status parseFrameHead(const uint8_t *p, size_t n, const StreamInfo &si, FrameHead &h);
 

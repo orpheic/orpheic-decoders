@@ -70,6 +70,54 @@ What a careful reader should know about this table:
 All the numbers, with charts, and how they were measured:
 **[orpheic.com/decoders](https://orpheic.com/decoders/)**
 
+## Against libFLAC and mpg123
+
+The table above is against FFmpeg. These numbers are against libFLAC, the
+reference FLAC library, and against mpg123, the MP3 decoder many players use.
+Both were called only through their public C APIs (`tools/refbench.cpp`). The
+method is the same: decoder alone, one thread, the same input bytes in memory
+for both, five timed rounds in alternating order, the median per file, then the
+median over the files. The files are the ones `tools/bench.sh` makes: 8 FLAC
+files and 32 MP3 files (LAME 3.100, 44.1 kHz stereo).
+
+| Times faster (median, lowest to highest) | Desktop PC (i9-14900K) | MacBook (Apple M4, on battery) | Raspberry Pi 5 |
+|---|---|---|---|
+| FLAC, against libFLAC | 1.67 (1.61 to 1.72), libFLAC 1.4.3 | 2.67 (2.48 to 2.85), libFLAC 1.5.0 | 1.43 (0.99 to 2.03), libFLAC 1.5.0 |
+| MP3 fast path, against mpg123 | 2.75 (2.52 to 2.98), mpg123 1.32.5 | 2.31 (2.05 to 2.45), mpg123 1.33.7 | 1.74 (1.63 to 1.84), mpg123 1.32.10 |
+
+- **On the Raspberry Pi 5, our FLAC decoder is not faster than libFLAC 1.5.0
+  on 24-bit files.** On the three 24-bit files it ran 1.00, 1.11 and 0.99
+  times as fast as libFLAC: the same speed. On the five 16-bit files it ran 1.38
+  to 2.03 times as fast.
+- **FLAC output is identical to libFLAC's**, sample for sample, in every frame
+  of all eight files on all three machines, and libFLAC's own MD5 check passed
+  on every file.
+- **MP3.** The largest gap between our fast path and mpg123 in a file was 0.5
+  to 3.8 millionths of full scale (median 1.1 to 1.25 millionths, depending on
+  the machine), at most about one eighth of one step of 16-bit output. mpg123's
+  output is about five times further from our exact path (the formulas of the
+  standard executed literally in double precision; see below) than our fast
+  path is: 1.1 to 1.25 millionths against 0.24, median. That exact path is our
+  own witness, not an outside reference.
+- libFLAC reads its input through a callback, and in this test the callback
+  copies the bytes. That copy is timed on its own and taken out in a second line
+  of the results; it moves the ratios by 0.01 to 0.03.
+- **What a careful reader should know.** The library versions differ between
+  machines: each is what that system ships, as listed in the table. The MacBook
+  ran on battery. The MP3 files come from one encoder at one sampling rate.
+  mpg123 is given the same packets as ours, but it finds the frame boundaries
+  itself, inside the timed part. Each machine was measured once. As a
+  cross-check, the same method against FFmpeg gave the numbers of the first
+  table again (for example 1.58 for FLAC on the Raspberry Pi 5).
+
+To repeat it: install the development files of libFLAC and libmpg123
+(pkg-config `flac` and `libmpg123`) as well as FFmpeg's, build, run
+`tools/bench.sh` once to fetch the files, then
+
+```
+build/refbench bench-corpus/flac/*.flac bench-corpus/mp3/*.mp3
+```
+
 ## Build
 
 ```
